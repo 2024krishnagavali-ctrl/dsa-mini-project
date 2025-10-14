@@ -1,200 +1,194 @@
-import java.util.LinkedList;
-import java.util.Scanner;
+import java.util.*;
 
-// Song class
-class Song {
+class Passenger {
     String name;
-    String artist;
-    String album;
-    int duration; // in seconds
+    int seatNo;
+    Passenger next;
 
-    public Song(String name, String artist, String album, int duration) {
+    Passenger(String name, int seatNo) {
         this.name = name;
-        this.artist = artist;
-        this.album = album;
-        this.duration = duration;
-    }
-
-    @Override
-    public String toString() {
-        return name + " by " + artist + " (" + album + ") [" + duration + "s]";
+        this.seatNo = seatNo;
+        this.next = null;
     }
 }
 
-// Song Library using LinkedList
-class SongLibrary {
-    LinkedList<Song> songs;
+class BusTicketSystem {
+    private Passenger head = null;
+    private Queue<String> waitingList;
+    private Stack<Passenger> cancelHistory;
+    private final int MAX_SEATS = 5;
+    private int bookedSeats = 0;
 
-    public SongLibrary() {
-        songs = new LinkedList<>();
+    // New tracking lists
+    private List<Long> bookingTimes;
+    private List<Long> cancelTimes;
+
+    BusTicketSystem() {
+        waitingList = new LinkedList<>();
+        cancelHistory = new Stack<>();
+        bookingTimes = new ArrayList<>();
+        cancelTimes = new ArrayList<>();
     }
 
-    public void addSong(Song song) {
-        songs.add(song);
-    }
-
-    public void displayAllSongs() {
-        if (songs.isEmpty()) {
-            System.out.println("No songs in the library.");
-            return;
-        }
-        System.out.println("Song Library:");
-        int i = 1;
-        for (Song s : songs) {
-            System.out.println(i + ". " + s);
-            i++;
-        }
-    }
-
-    public Song getSong(int index) {
-        if (index >= 0 && index < songs.size()) {
-            return songs.get(index);
+    void bookTicket(String name) {
+        if (bookedSeats < MAX_SEATS) {
+            bookedSeats++;
+            Passenger newPassenger = new Passenger(name, bookedSeats);
+            addPassenger(newPassenger);
+            bookingTimes.add(System.currentTimeMillis()); // track booking time
+            System.out.println("✅ Ticket booked for " + name + " | Seat No: " + bookedSeats);
         } else {
-            return null;
+            waitingList.add(name);
+            System.out.println("⏳ No seats available! " + name + " added to waiting list.");
         }
     }
 
-    public int size() {
-        return songs.size();
+    private void addPassenger(Passenger newP) {
+        if (head == null) head = newP;
+        else {
+            Passenger temp = head;
+            while (temp.next != null) temp = temp.next;
+            temp.next = newP;
+        }
+    }
+
+    void cancelTicket(int seatNo) {
+        if (head == null) {
+            System.out.println("❌ No bookings found.");
+            return;
+        }
+        Passenger temp = head, prev = null;
+        while (temp != null && temp.seatNo != seatNo) {
+            prev = temp;
+            temp = temp.next;
+        }
+        if (temp == null) {
+            System.out.println("❌ Seat not found.");
+            return;
+        }
+
+        if (prev == null) head = temp.next;
+        else prev.next = temp.next;
+
+        bookedSeats--;
+        cancelHistory.push(temp);
+        cancelTimes.add(System.currentTimeMillis()); // track cancellation time
+        System.out.println("🚫 Ticket canceled for " + temp.name + " | Seat No: " + temp.seatNo);
+
+        if (!waitingList.isEmpty()) {
+            String nextPassenger = waitingList.poll();
+            bookTicket(nextPassenger);
+            System.out.println("🎟️ Seat reassigned to " + nextPassenger + " from waiting list.");
+        }
+    }
+
+    void undoCancel() {
+        if (cancelHistory.isEmpty()) {
+            System.out.println("❌ Nothing to undo.");
+            return;
+        }
+        Passenger lastCanceled = cancelHistory.pop();
+        bookTicket(lastCanceled.name);
+        System.out.println("↩️ Undo successful: Rebooked for " + lastCanceled.name);
+    }
+
+    void displayBookings() {
+        System.out.println("\n📋 Current Bookings:");
+        Passenger temp = head;
+        if (temp == null) {
+            System.out.println("No confirmed bookings.");
+            return;
+        }
+        while (temp != null) {
+            System.out.println("Seat " + temp.seatNo + ": " + temp.name);
+            temp = temp.next;
+        }
+    }
+
+    void displayWaitingList() {
+        System.out.println("\n🕒 Waiting List:");
+        if (waitingList.isEmpty()) System.out.println("No one in waiting list.");
+        else for (String name : waitingList) System.out.println(name);
+    }
+
+    // --------------------------
+    // 🧮 NEW AUTOMATION SECTION
+    // --------------------------
+
+    void predictBusStatus() {
+        if (bookingTimes.size() < 2) {
+            System.out.println("\n📊 Not enough data for prediction yet.");
+            return;
+        }
+
+        // Calculate average booking interval (ms)
+        long totalInterval = 0;
+        for (int i = 1; i < bookingTimes.size(); i++) {
+            totalInterval += (bookingTimes.get(i) - bookingTimes.get(i - 1));
+        }
+        long avgBookingInterval = totalInterval / (bookingTimes.size() - 1);
+
+        int remainingSeats = MAX_SEATS - bookedSeats;
+        double minutesToFull = (avgBookingInterval * remainingSeats) / 60000.0;
+
+        // Estimate cancellation probability
+        double cancelProb = 0.0;
+        if (!cancelTimes.isEmpty()) {
+            cancelProb = Math.min(1.0, cancelTimes.size() / (double) bookingTimes.size());
+        }
+
+        System.out.println("\n📈 PREDICTION REPORT:");
+        System.out.printf("Seats booked: %d / %d%n", bookedSeats, MAX_SEATS);
+        System.out.printf("Estimated time until bus is full: %.2f minutes%n", minutesToFull);
+        System.out.printf("Estimated cancellation probability: %.1f%%%n", cancelProb * 100);
     }
 }
 
-// Playlist Manager with Queue and Stack
-class PlaylistManager {
-    LinkedList<Song> recentlyPlayed; // Queue
-    LinkedList<Song> undoStack;       // Stack
-    int maxRecent;
-
-    public PlaylistManager(int maxRecent) {
-        recentlyPlayed = new LinkedList<>();
-        undoStack = new LinkedList<>();
-        this.maxRecent = maxRecent;
-    }
-
-    public void playSong(Song song) {
-        System.out.println("Playing: " + song);
-        // Add to recently played queue
-        recentlyPlayed.addLast(song);
-        if (recentlyPlayed.size() > maxRecent) {
-            recentlyPlayed.removeFirst(); // maintain max size
-        }
-        // Push to undo stack
-        undoStack.push(song);
-    }
-
-    public void skipSong(Song song) {
-        System.out.println("Skipped: " + song);
-        // Push skipped song to undo stack
-        undoStack.push(song);
-    }
-
-    public void undoLastAction() {
-        if (undoStack.isEmpty()) {
-            System.out.println("Nothing to undo.");
-            return;
-        }
-        Song last = undoStack.pop();
-        System.out.println("Undoing last action. You can replay: " + last);
-        playSong(last);
-    }
-
-    public void showRecentlyPlayed() {
-        if (recentlyPlayed.isEmpty()) {
-            System.out.println("No recently played songs.");
-            return;
-        }
-        System.out.println("Recently Played Songs:");
-        for (Song s : recentlyPlayed) {
-            System.out.println("- " + s);
-        }
-    }
-
-    // Simple prediction: pick song not in recently played
-    public void predictNextSong(SongLibrary library) {
-        for (Song s : library.songs) {
-            if (!recentlyPlayed.contains(s)) {
-                System.out.println("Predicted Next Song: " + s);
-                return;
-            }
-        }
-        System.out.println("No prediction available (all songs recently played).");
-    }
-}
-
-// Main Program
-public class busManagementSystem {
+public class Main {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
-        SongLibrary library = new SongLibrary();
-        PlaylistManager manager = new PlaylistManager(5); // Keep last 5 songs
+        BusTicketSystem bus = new BusTicketSystem();
 
-        // Sample songs
-        library.addSong(new Song("Shape of You", "Ed Sheeran", "Divide", 240));
-        library.addSong(new Song("Blinding Lights", "The Weeknd", "After Hours", 200));
-        library.addSong(new Song("Levitating", "Dua Lipa", "Future Nostalgia", 203));
-        library.addSong(new Song("Believer", "Imagine Dragons", "Evolve", 210));
-        library.addSong(new Song("Perfect", "Ed Sheeran", "Divide", 265));
-
-        int choice;
-        do {
-            System.out.println("\n--- Predictive Song Playlist ---");
-            System.out.println("1. Display All Songs");
-            System.out.println("2. Play a Song");
-            System.out.println("3. Skip a Song");
-            System.out.println("4. Undo Last Action");
-            System.out.println("5. Show Recently Played");
-            System.out.println("6. Predict Next Song");
+        while (true) {
+            System.out.println("\n--- BUS TICKET MANAGEMENT ---");
+            System.out.println("1. Book Ticket");
+            System.out.println("2. Cancel Ticket");
+            System.out.println("3. Undo Last Cancel");
+            System.out.println("4. Show Bookings");
+            System.out.println("5. Show Waiting List");
+            System.out.println("6. Predict Bus Status");
             System.out.println("7. Exit");
-            System.out.print("Enter your choice: ");
-            choice = sc.nextInt();
-            sc.nextLine(); // consume newline
+            System.out.print("Enter choice: ");
+            int ch = sc.nextInt();
+            sc.nextLine();
 
-            switch (choice) {
+            switch (ch) {
                 case 1:
-                    library.displayAllSongs();
+                    System.out.print("Enter passenger name: ");
+                    bus.bookTicket(sc.nextLine());
                     break;
                 case 2:
-                    library.displayAllSongs();
-                    System.out.print("Enter song number to play: ");
-                    int playIndex = sc.nextInt() - 1;
-                    sc.nextLine();
-                    Song playSong = library.getSong(playIndex);
-                    if (playSong != null) {
-                        manager.playSong(playSong);
-                    } else {
-                        System.out.println("Invalid song selection.");
-                    }
+                    System.out.print("Enter seat number to cancel: ");
+                    bus.cancelTicket(sc.nextInt());
                     break;
                 case 3:
-                    library.displayAllSongs();
-                    System.out.print("Enter song number to skip: ");
-                    int skipIndex = sc.nextInt() - 1;
-                    sc.nextLine();
-                    Song skipSong = library.getSong(skipIndex);
-                    if (skipSong != null) {
-                        manager.skipSong(skipSong);
-                    } else {
-                        System.out.println("Invalid song selection.");
-                    }
+                    bus.undoCancel();
                     break;
                 case 4:
-                    manager.undoLastAction();
+                    bus.displayBookings();
                     break;
                 case 5:
-                    manager.showRecentlyPlayed();
+                    bus.displayWaitingList();
                     break;
                 case 6:
-                    manager.predictNextSong(library);
+                    bus.predictBusStatus();
                     break;
                 case 7:
-                    System.out.println("Exiting... Goodbye!");
-                    break;
+                    System.out.println("🚍 Exiting...");
+                    return;
                 default:
-                    System.out.println("Invalid choice. Try again.");
+                    System.out.println("❌ Invalid choice.");
             }
-
-        } while (choice != 7);
-
-        sc.close();
+        }
     }
 }
