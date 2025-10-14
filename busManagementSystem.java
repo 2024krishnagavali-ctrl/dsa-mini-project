@@ -111,40 +111,43 @@ class BusTicketSystem {
         else for (String name : waitingList) System.out.println(name);
     }
 
-    // --------------------------
-    // 🧮 NEW AUTOMATION SECTION
-    // --------------------------
-
-    void predictBusStatus() {
-        if (bookingTimes.size() < 2) {
-            System.out.println("\n📊 Not enough data for prediction yet.");
-            return;
-        }
-
-        // Calculate average booking interval (ms)
-        long totalInterval = 0;
-        for (int i = 1; i < bookingTimes.size(); i++) {
-            totalInterval += (bookingTimes.get(i) - bookingTimes.get(i - 1));
-        }
-        long avgBookingInterval = totalInterval / (bookingTimes.size() - 1);
-
-        int remainingSeats = MAX_SEATS - bookedSeats;
-        double minutesToFull = (avgBookingInterval * remainingSeats) / 60000.0;
-
-        // Estimate cancellation probability
-        double cancelProb = 0.0;
-        if (!cancelTimes.isEmpty()) {
-            cancelProb = Math.min(1.0, cancelTimes.size() / (double) bookingTimes.size());
-        }
-
-        System.out.println("\n📈 PREDICTION REPORT:");
-        System.out.printf("Seats booked: %d / %d%n", bookedSeats, MAX_SEATS);
-        System.out.printf("Estimated time until bus is full: %.2f minutes%n", minutesToFull);
-        System.out.printf("Estimated cancellation probability: %.1f%%%n", cancelProb * 100);
+   void predictBusStatus() {
+    if (bookingTimes.size() < 2) {
+        System.out.println("\n📊 Not enough data for prediction yet.");
+        return;
     }
+
+    long totalInterval = 0;
+    for (int i = 1; i < bookingTimes.size(); i++) {
+        totalInterval += (bookingTimes.get(i) - bookingTimes.get(i - 1));
+    }
+    long avgBookingInterval = totalInterval / (bookingTimes.size() - 1);
+
+    int remainingSeats = MAX_SEATS - bookedSeats;
+    double minutesToFull = (avgBookingInterval * remainingSeats) / 60000.0;
+
+    // ✅ Calculate probability of waiting list passenger getting a seat
+    double chanceForWaitingList = 0.0;
+    if (!cancelTimes.isEmpty() && !waitingList.isEmpty()) {
+        double cancelRate = cancelTimes.size() / (double) bookingTimes.size();
+        chanceForWaitingList = Math.min(1.0, cancelRate / waitingList.size());
+    }
+
+    System.out.println("\n📈 PREDICTION REPORT:");
+    System.out.printf("Seats booked: %d / %d%n", bookedSeats, MAX_SEATS);
+    System.out.printf("Estimated time until bus is full: %.2f minutes%n", minutesToFull);
+
+    if (waitingList.isEmpty()) {
+        System.out.println("🎟️ No one in the waiting list currently.");
+    } else {
+        System.out.printf("🎯 Estimated chance of getting a seat (for waiting list): %.1f%%%n",
+                          chanceForWaitingList * 100);
+    }
+    
+}
 }
 
-public class Main {
+public class busManagementSystem {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
         BusTicketSystem bus = new BusTicketSystem();
